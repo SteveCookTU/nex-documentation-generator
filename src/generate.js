@@ -52,8 +52,8 @@ function generateDocumentation(tree, outputPath) {
 	|   Into smaller, more managable, pieces    |
 	-------------------------------------------*/
 
-	var protocolMethods = [];
-	var protocolClasses = [];
+	const protocolMethods = [];
+	const protocolClasses = [];
 	let protocolName;
 	let protocolID;
 
@@ -82,7 +82,9 @@ function generateDocumentation(tree, outputPath) {
 				members: classMembers,
 				parentClassName: classParentClassName
 			});
-		} else if (element.body instanceof DDL.DDLProtocolDeclaration) {
+		}
+
+		if (element.body instanceof DDL.DDLProtocolDeclaration) {
 			// Could also be element.body.declaration.unitName.value ?
 			protocolName = element.body.declaration.nameSpaceItem.parseTreeItem1.name.value;
 			protocolID = 'Unknown ID'; // TODO: Find a way to find this!!
@@ -121,21 +123,17 @@ function generateDocumentation(tree, outputPath) {
 					responseParameters: methodResponseParameters,
 				});
 			}
-
-			/*------------------------------------------------
-			| Now start building a .md file for the protocol |
-			------------------------------------------------*/
-
-			const markdown = buildMarkDown(protocolName, protocolID, protocolMethods, protocolClasses);
-
-			fs.ensureDirSync(`${outputPath}`);
-			fs.writeFileSync(`${outputPath}/${protocolName}.md`, markdown);
-
-			protocolMethods = [];
-			protocolClasses = [];
-
 		}
 	}
+
+	/*------------------------------------------------
+	| Now start building a .md file for the protocol |
+	------------------------------------------------*/
+
+	const markdown = buildMarkDown(protocolName, protocolID, protocolMethods, protocolClasses);
+
+	fs.ensureDirSync(`${outputPath}`);
+	fs.writeFileSync(`${outputPath}/${protocolName}.md`, markdown);
 }
 
 function buildMarkDown(protocolName, protocolID, protocolMethods, protocolClasses) {
@@ -165,7 +163,7 @@ function buildMethodsTable(protocolMethods) {
 	for (const protocolMethod of protocolMethods) {
 		const methodID = protocolMethods.indexOf(protocolMethod) + 1;
 		const methodHyperlink = `[${protocolMethod.name}](#${methodID}-${protocolMethod.name.toLowerCase()})`;
-
+		
 		table += `\n| ${methodID} | ${methodHyperlink} |`;
 	}
 
@@ -286,7 +284,7 @@ function buildClassesDocumentation(protocolClasses) {
 	for (const protocolClass of protocolClasses) {
 		const parentClassInFile = protocolClasses.some(({ name }) => name === protocolClass.parentClassName);
 		let parentClassName = protocolClass.parentClassName;
-
+		
 		if (parentClassInFile) {
 			parentClassName = `[${parentClassName}](#${parentClassName.toLowerCase()})`;
 		}
