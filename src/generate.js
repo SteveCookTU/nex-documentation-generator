@@ -355,7 +355,10 @@ function buildClassesDocumentation(protocolClasses) {
 		const parentClassInFile = protocolClasses.some(({ name }) => name === protocolClass.parentClassName);
 		let parentClassName = protocolClass.parentClassName;
 
+		let rustCode = `\`\`\`rust\n#[derive(Default, EndianRead, EndianWrite)]\npub struct ${protocolClass.name} {\n`;
+
 		if (parentClassInFile) {
+			rustCode += `    ${parentClassName.toLowerCase()}: ${parentClassName}\n`;
 			parentClassName = `[${parentClassName}](#${parentClassName.toLowerCase()})`;
 		}
 
@@ -374,13 +377,23 @@ function buildClassesDocumentation(protocolClasses) {
 		for (const member of protocolClass.members) {
 			let memberType = member.type;
 			const memberTypeInFile = protocolClasses.some(({ name }) => name === memberType);
+			if (!member.name.includes('dummy')) {
+				rustCode += `    ${member.name}: `;
+			}
 
 			if (memberTypeInFile) {
+				rustCode += `${memberType}\n`;
 				memberType = `[${memberType}](#${memberType.toLowerCase()})`;
 			}
 
 			if (COMMON_TYPE_CONVERSIONS[memberType]) {
 				memberType = COMMON_TYPE_CONVERSIONS[memberType];
+				rustCode += `${memberType},\n`;
+			} else if (memberType.startsWith('any')) {
+				let data_type = memberType.split('<')[1].split(',')[0];
+				rustCode += `DataHolder<${data_type}>,\n`;
+			} else if (COMMON_TYPE_LINKS[memberType]) {
+				rustCode += `${memberType},\n`;
 			}
 
 			if (COMMON_TYPE_LINKS[memberType]) {
@@ -399,6 +412,7 @@ function buildClassesDocumentation(protocolClasses) {
 
 				if (COMMON_TYPE_CONVERSIONS[listType]) {
 					listType = COMMON_TYPE_CONVERSIONS[listType];
+					rustCode += `NexList<${listType}>,\n`;
 				}
 
 				if (COMMON_TYPE_LINKS[listType]) {
@@ -410,7 +424,8 @@ function buildClassesDocumentation(protocolClasses) {
 
 			classDocumentation += `\n| ${member.name} | ${he.encode(memberType)} |`;
 		}
-
+		rustCode += '}\n```';
+		classDocumentation += '\n' + rustCode;
 		classesDocumentation += classDocumentation;
 	}
 
