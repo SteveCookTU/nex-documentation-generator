@@ -26,25 +26,25 @@ const kinnayWikiBase = 'https://github.com/kinnay/NintendoClients/wiki';
 
 // Standardize the type names to match Kinnay's wiki
 const COMMON_TYPE_CONVERSIONS = {
-	'qvector<byte>': 'Buffer',
-	'byte': 'Uint8',
-	'uint16': 'Uint16',
-	'uint32': 'Uint32',
-	'uint64': 'Uint64',
-	'int8': 'Sint8',
-	'int16': 'Sint16',
-	'int32': 'Sint32',
-	'int64': 'Sint64',
-	'string': 'String',
-	'bool': 'Bool',
+	'qvector<byte>': 'NexBuffer',
+	'byte': 'u8',
+	'uint16': 'u16',
+	'uint32': 'u32',
+	'uint64': 'u64',
+	'int8': 'i8',
+	'int16': 'i16',
+	'int32': 'i32',
+	'int64': 'i64',
+	'string': 'NexString',
+	'bool': 'bool',
 	'datetime': 'DateTime',
-	'qresult': 'Result',
+	'qresult': 'ResultCode',
 	'stationurl': 'StationURL',
-	'qBuffer': 'qBuffer', // Just so it's found
-	'buffer': 'Buffer',
+	'qBuffer': 'NexQBuffer', // Just so it's found
+	'buffer': 'NexBuffer',
 	'ResultRange': 'ResultRange', // Just so it's found
 	'variant': 'Variant',
-	'any<Data,string>': 'AnyDataHolder' // unsure if this can look different
+	'any<Data,string>': 'DataHolder' // unsure if this can look different
 };
 
 // Links to common types in Kinnay's wiki
@@ -72,8 +72,8 @@ function generateDocumentation(tree, outputPath) {
 	|   Into smaller, more managable, pieces    |
 	-------------------------------------------*/
 
-	const protocolMethods = [];
-	const protocolClasses = [];
+	var protocolMethods = [];
+	var protocolClasses = [];
 	let protocolName;
 	let protocolID;
 
@@ -156,6 +156,9 @@ function generateDocumentation(tree, outputPath) {
 			fs.ensureDirSync(`${outputPath}`);
 			fs.writeFileSync(`${outputPath}/${protocolName}.md`, markdown);
 
+			protocolMethods = [];
+			protocolClasses = [];
+
 			console.log(`[${logSymbols.success}]`, `Writing protocol documentation to ${outputPath}/${protocolName}.md\n`.green.bold);
 		}
 	}
@@ -173,7 +176,7 @@ function buildMarkDown(protocolName, protocolID, protocolMethods, protocolClasse
 
 	for (const protocolMethod of protocolMethods) {
 		const methodID = protocolMethods.indexOf(protocolMethod) + 1;
-		const methodDocumentation = buildMethodDocumentation(protocolMethod, methodID, protocolClasses);
+		const methodDocumentation = buildMethodDocumentation(protocolName, protocolMethod, methodID, protocolClasses);
 		mdFileContents += `\n\n${methodDocumentation}`;
 	}
 
@@ -192,20 +195,24 @@ function buildMethodsTable(protocolMethods) {
 	for (const protocolMethod of protocolMethods) {
 		const methodID = protocolMethods.indexOf(protocolMethod) + 1;
 		const methodHyperlink = `[${protocolMethod.name}](#${methodID}-${protocolMethod.name.toLowerCase()})`;
-		
+
 		table += `\n| ${methodID} | ${methodHyperlink} |`;
 	}
 
 	return table;
 }
 
-function buildMethodDocumentation(protocolMethod, methodID, protocolClasses) {
+function buildMethodDocumentation(protocolName, protocolMethod, methodID, protocolClasses) {
 	let methodDocumentation = `# (${methodID}) ${protocolMethod.name}`;
+
+	let rustCode = `\`\`\`rust\n#[derive(Default, EndianRead, EndianWrite)]\npub struct ${protocolMethod.name}Input {\n`;
 
 	let requestDocumentation = '\n\n## Request';
 
 	if (protocolMethod.requestParameters.length === 0) {
 		requestDocumentation += '\nThis method does not take any parameters';
+		rustCode += '}\n```';
+		requestDocumentation += '\n' + rustCode;
 	} else {
 		requestDocumentation += '\n| Type | Name | Description |';
 		requestDocumentation += '\n| --- | --- | --- |';
@@ -213,9 +220,16 @@ function buildMethodDocumentation(protocolMethod, methodID, protocolClasses) {
 		for (const requestParameter of protocolMethod.requestParameters) {
 			let type = requestParameter.value;
 
+			rustCode += '    ' + requestParameter.name.toLowerCase() + ': ';
+
 			if (COMMON_TYPE_CONVERSIONS[type]) {
 				type = COMMON_TYPE_CONVERSIONS[type];
+				rustCode += `${type},\n`;
+			} else if (type.startsWith('any')) {
+				let data_type = type.split('<')[1].split(',')[0];
+				rustCode += `DataHolder<${data_type}>,\n`;
 			}
+
 
 			if (COMMON_TYPE_LINKS[type]) {
 				type = `[${type}](${COMMON_TYPE_LINKS[type]})`;
@@ -233,6 +247,7 @@ function buildMethodDocumentation(protocolMethod, methodID, protocolClasses) {
 
 				if (COMMON_TYPE_CONVERSIONS[listType]) {
 					listType = COMMON_TYPE_CONVERSIONS[listType];
+					rustCode += `NexList<${listType}>,\n`;
 				}
 
 				if (COMMON_TYPE_LINKS[listType]) {
@@ -240,6 +255,7 @@ function buildMethodDocumentation(protocolMethod, methodID, protocolClasses) {
 				}
 
 				type = `[List](${kinnayWikiBase + '/NEX-Common-Types#list'})<${listType}>`;
+
 			}
 
 			const typeInFile = protocolClasses.some(({ name }) => name === type);
@@ -249,14 +265,19 @@ function buildMethodDocumentation(protocolMethod, methodID, protocolClasses) {
 
 			requestDocumentation += `\n| ${he.encode(type)} | ${requestParameter.name} |  |`;
 		}
+		rustCode += '}\n```';
+		requestDocumentation += '\n' + rustCode;
 	}
 
 	methodDocumentation += requestDocumentation;
 
+	rustCode = `\`\`\`rust\n#[derive(Default, EndianRead, EndianWrite)]\npub struct ${protocolMethod.name}Output {\n`;
 	let responseDocumentation = '\n\n## Response';
 
 	if (protocolMethod.responseParameters.length === 0) {
 		responseDocumentation += '\nThis method does not return anything';
+		rustCode += '}\n```';
+		responseDocumentation += '\n' + rustCode;
 	} else {
 		responseDocumentation += '\n| Type | Name | Description |';
 		responseDocumentation += '\n| --- | --- | --- |';
@@ -264,8 +285,18 @@ function buildMethodDocumentation(protocolMethod, methodID, protocolClasses) {
 		for (const responseParameter of protocolMethod.responseParameters) {
 			let type = responseParameter.value;
 
+			if (responseParameter.name.toLowerCase() === '%retval%') {
+				rustCode += '    val: ';
+			} else {
+				rustCode += '    ' + responseParameter.name.toLowerCase() + ': ';
+			}
+
 			if (COMMON_TYPE_CONVERSIONS[type]) {
 				type = COMMON_TYPE_CONVERSIONS[type];
+				rustCode += `${type},\n`;
+			} else if (type.startsWith('any')) {
+				let data_type = type.split('<')[1].split(',')[0];
+				rustCode += `DataHolder<${data_type}>,\n`;
 			}
 
 			if (COMMON_TYPE_LINKS[type]) {
@@ -284,6 +315,7 @@ function buildMethodDocumentation(protocolMethod, methodID, protocolClasses) {
 
 				if (COMMON_TYPE_CONVERSIONS[listType]) {
 					listType = COMMON_TYPE_CONVERSIONS[listType];
+					rustCode += `NexList<${listType}>,\n`;
 				}
 
 				if (COMMON_TYPE_LINKS[listType]) {
@@ -300,6 +332,9 @@ function buildMethodDocumentation(protocolMethod, methodID, protocolClasses) {
 
 			responseDocumentation += `\n| ${he.encode(type)} | ${responseParameter.name} |  |`;
 		}
+
+		rustCode += '}\n```';
+		responseDocumentation += '\n' + rustCode;
 	}
 
 	methodDocumentation += responseDocumentation;
@@ -313,7 +348,7 @@ function buildClassesDocumentation(protocolClasses) {
 	for (const protocolClass of protocolClasses) {
 		const parentClassInFile = protocolClasses.some(({ name }) => name === protocolClass.parentClassName);
 		let parentClassName = protocolClass.parentClassName;
-		
+
 		if (parentClassInFile) {
 			parentClassName = `[${parentClassName}](#${parentClassName.toLowerCase()})`;
 		}
