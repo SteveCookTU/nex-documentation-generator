@@ -228,6 +228,8 @@ function buildMethodDocumentation(protocolName, protocolMethod, methodID, protoc
 			} else if (type.startsWith('any')) {
 				let data_type = type.split('<')[1].split(',')[0];
 				rustCode += `DataHolder<${data_type}>,\n`;
+			} else if (COMMON_TYPE_LINKS[type]) {
+				rustCode += `${type},\n`;
 			}
 
 
@@ -260,6 +262,7 @@ function buildMethodDocumentation(protocolName, protocolMethod, methodID, protoc
 
 			const typeInFile = protocolClasses.some(({ name }) => name === type);
 			if (typeInFile) {
+				rustCode += `${type},\n`;
 				type = `[${type}](#${type.toLowerCase()})`;
 			}
 
@@ -297,6 +300,8 @@ function buildMethodDocumentation(protocolName, protocolMethod, methodID, protoc
 			} else if (type.startsWith('any')) {
 				let data_type = type.split('<')[1].split(',')[0];
 				rustCode += `DataHolder<${data_type}>,\n`;
+			} else if (COMMON_TYPE_LINKS[type]) {
+				rustCode += `${type},\n`;
 			}
 
 			if (COMMON_TYPE_LINKS[type]) {
@@ -327,6 +332,7 @@ function buildMethodDocumentation(protocolName, protocolMethod, methodID, protoc
 
 			const typeInFile = protocolClasses.some(({ name }) => name === type);
 			if (typeInFile) {
+				rustCode += `${type},\n`;
 				type = `[${type}](#${type.toLowerCase()})`;
 			}
 
